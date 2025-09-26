@@ -10,12 +10,29 @@ export async function getLatestProducts() {
 		orderBy: { createdAt: "desc" },
 	});
 
-	return convertToPlainObject(data);
+	// Convert rating from string to number
+	const products = convertToPlainObject(data);
+	return products.map((product) => ({
+		...product,
+		rating: typeof product.rating === "string" ? parseFloat(product.rating) : product.rating,
+	}));
 }
 
 // Get single product by slug
 export async function getProductBySlug(slug: string) {
-	return await prisma.product.findFirst({
+	const product = await prisma.product.findFirst({
 		where: { slug: slug },
 	});
+
+	if (!product) return null;
+
+	// Convert rating from string to number
+	const plainProduct = convertToPlainObject(product);
+	return {
+		...plainProduct,
+		rating:
+			typeof plainProduct.rating === "string"
+				? parseFloat(plainProduct.rating)
+				: plainProduct.rating,
+	};
 }

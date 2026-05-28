@@ -4,18 +4,11 @@ import NextAuth from "next-auth";
 import CredentialsProvider from "next-auth/providers/credentials";
 import { prisma } from "@/db/prisma";
 import { PrismaAdapter } from "@auth/prisma-adapter";
-import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
+import { authConfig } from "./auth.config";
 
-export const config = {
-	pages: {
-		signIn: "/sign-in",
-		error: "/sign-in",
-	},
-	session: {
-		strategy: "jwt",
-		maxAge: 30 * 24 * 60 * 60,
-	},
+export const config: NextAuthConfig = {
+	...authConfig,
 	adapter: PrismaAdapter(prisma),
 	providers: [
 		CredentialsProvider({
@@ -53,11 +46,14 @@ export const config = {
 		}),
 	],
 	callbacks: {
-		async jwt({ token, user, trigger, session }: any) {
+		...authConfig.callbacks,
+		async jwt({ token, user, trigger, session }) {
 			if (user) {
 				// Assign user properties to the token
 				token.id = user.id;
-				token.role = user.role;
+				if (user && "role" in user && typeof user.role === "string") {
+					token.role = user.role;
+				}
 
 				if (trigger === "signIn" || trigger === "signUp") {
 					const cookiesObject = await cookies();
@@ -68,7 +64,7 @@ export const config = {
 							where: { sessionCartId },
 						});
 
-						if (sessionCart) {
+						if (sessionCart && user.id) {
 							// Overwrite any existing user cart
 							await prisma.cart.deleteMany({
 								where: { userId: user.id },
@@ -90,11 +86,15 @@ export const config = {
 			}
 			return token;
 		},
-		async session({ session, token, trigger }: any) {
+		async session({ session, token, trigger }) {
 			// Map the token data to the session object
-			session.user.id = token.id;
+			if (typeof token.id === "string") {
+				session.user.id = token.id;
+			}
 			session.user.name = token.name;
-			session.user.role = token.role;
+			if (typeof token.role === "string") {
+				session.user.role = token.role;
+			}
 
 			// Optionally handle session updates (like name change)
 			if (trigger === "update" && token.name) {
@@ -104,49 +104,7 @@ export const config = {
 			// Return the updated session object
 			return session;
 		},
-		authorized({ request, auth }: any) {
-			// Array of regex patterns of protected paths
-			const protectedPaths = [
-				/\/shipping-address/,
-				/\/payment-method/,
-				/\/place-order/,
-				/\/profile/,
-				/\/user\/(.*)/,
-				/\/order\/(.*)/,
-				/\/admin/,
-			];
-
-			// Get pathname from the req URL object
-			const { pathname } = request.nextUrl;
-
-			// Check if user is not authenticated and on a protected path
-			if (!auth && protectedPaths.some((p) => p.test(pathname))) return false;
-
-			// Check for cart cookie
-			if (!request.cookies.get("sessionCartId")) {
-				// Generate cart cookie
-				const sessionCartId = crypto.randomUUID();
-
-				// Clone the request headers
-				const newRequestHeaders = new Headers(request.headers);
-
-				// Create a new response and add the new headers
-				const response = NextResponse.next({
-					request: {
-						headers: newRequestHeaders,
-					},
-				});
-
-				// Set the newly generated sessionCartId in the response cookies
-				response.cookies.set("sessionCartId", sessionCartId);
-
-				// Return the response with the sessionCartId set
-				return response;
-			} else {
-				return true;
-			}
-		},
 	},
-} satisfies NextAuthConfig;
+};
 
 export const { handlers, auth, signIn, signOut } = NextAuth(config);

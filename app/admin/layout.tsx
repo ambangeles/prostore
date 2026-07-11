@@ -1,3 +1,4 @@
+import AdminSearch from "@/app/admin/admin-search";
 import { MainNav } from "@/app/admin/main-nav";
 import Menu from "@/components/shared/header/menu";
 import { Input } from "@/components/ui/input";
@@ -21,13 +22,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
 						</Link>
 						<MainNav className="mx-6" />
 						<div className="ml-auto flex items-center space-x-4">
-							<div>
-								<Input
-									type="search"
-									placeholder="Search..."
-									className="md:w-[100px] lg:w-[300px]"
-								/>
-							</div>
+							<AdminSearch />
 							<Menu />
 						</div>
 					</div>

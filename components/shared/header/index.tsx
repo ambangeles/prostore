@@ -1,4 +1,6 @@
+import CategoriesDrawer from "@/components/shared/header/categories-drawer";
 import Menu from "@/components/shared/header/menu";
+import Search from "@/components/shared/header/search";
 import { APP_NAME } from "@/lib/constants";
 import Image from "next/image";
 import Link from "next/link";
@@ -8,7 +10,8 @@ const Header = () => {
 		<header className="w-full border-b">
 			<div className="wrapper flex-between">
 				<div className="flex-start">
-					<Link href="/" className="flex-start">
+					<CategoriesDrawer />
+					<Link href="/" className="flex-start ml-4">
 						<Image
 							priority={true}
 							src="/images/logo.svg"
@@ -18,6 +21,9 @@ const Header = () => {
 						/>
 						<span className="hidden lg:block font-bold text-2xl ml-3">{APP_NAME}</span>
 					</Link>
+				</div>
+				<div className="hidden md:block">
+					<Search />
 				</div>
 				<Menu />
 			</div>

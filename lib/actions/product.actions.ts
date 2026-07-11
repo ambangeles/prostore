@@ -5,6 +5,7 @@ import { convertToPlainObject, formatError } from "../utils";
 import { revalidatePath } from "next/cache";
 import { insertProductSchema, updateProductSchema } from "../validator";
 import z from "zod";
+import { Prisma } from "@prisma/client";
 
 // Get the latest products
 export async function getLatestProducts() {
@@ -46,21 +47,76 @@ export async function getAllProducts({
 	limit = PAGE_SIZE,
 	page,
 	category,
+	price,
+	rating,
+	sort,
 }: {
 	query: string;
+	category: string;
 	limit?: number;
 	page: number;
-	category: string;
+	price?: string;
+	rating?: string;
+	sort?: string;
 }) {
+	// Filter by query
+	const queryFilter: Prisma.ProductWhereInput =
+		query && query !== "all"
+			? {
+					name: {
+						contains: query,
+						mode: "insensitive",
+					} as Prisma.StringFilter,
+				}
+			: {};
+
+	// Filter by category
+	const categoryFilter = category && category !== "all" ? { category } : {};
+
+	// Filter by price
+	const priceFilter: Prisma.ProductWhereInput =
+		price && price !== "all"
+			? {
+					price: {
+						gte: Number(price.split("-")[0]),
+						lte: Number(price.split("-")[1]),
+					},
+				}
+			: {};
+
+	// Filter by rating
+	const ratingFilter = rating && rating !== "all" ? { rating: { gte: Number(rating) } } : {};
+
+	// Fetch products
 	const data = await prisma.product.findMany({
+		where: {
+			...queryFilter,
+			...categoryFilter,
+			...ratingFilter,
+			...priceFilter,
+		},
+		orderBy:
+			sort === "lowest"
+				? { price: "asc" }
+				: sort === "highest"
+					? { price: "desc" }
+					: sort === "rating"
+						? { rating: "desc" }
+						: { createdAt: "desc" },
 		skip: (page - 1) * limit,
 		take: limit,
 	});
 
 	const dataCount = await prisma.product.count();
 
+	const products = convertToPlainObject(data);
+
 	return {
-		data,
+		data: products.map((product) => ({
+			...product,
+			rating:
+				typeof product.rating === "string" ? parseFloat(product.rating) : product.rating,
+		})),
 		totalPages: Math.ceil(dataCount / limit),
 	};
 }
@@ -146,4 +202,29 @@ export async function getProductById(productId: string) {
 				? parseFloat(plainProduct.rating)
 				: plainProduct.rating,
 	};
+}
+
+// Get product categories
+export async function getAllCategories() {
+	const data = await prisma.product.groupBy({
+		by: ["category"],
+		_count: true,
+	});
+
+	return data;
+}
+
+// Get featured products
+export async function getFeaturedProducts() {
+	const data = await prisma.product.findMany({
+		where: { isFeatured: true },
+		orderBy: { createdAt: "desc" },
+		take: 4,
+	});
+
+	const products = convertToPlainObject(data);
+	return products.map((product) => ({
+		...product,
+		rating: typeof product.rating === "string" ? parseFloat(product.rating) : product.rating,
+	}));
 }
